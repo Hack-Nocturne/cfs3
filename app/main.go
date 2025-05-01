@@ -10,6 +10,7 @@ import (
 	"github.com/Hack-Nocturne/cfs3/utils"
 	"github.com/Hack-Nocturne/cfs3/vars"
 	"github.com/Hack-Nocturne/cfs3/worker"
+	_ "github.com/joho/godotenv/autoload"
 )
 
 func init() {
@@ -17,7 +18,8 @@ func init() {
 }
 
 func main() {
-	// get config file from command line args or use default
+	defer func() { os.RemoveAll(vars.UPLOAD_BASE_DIR) }()
+
 	configFile := "cfs3.config.json"
 	if len(os.Args) > 1 {
 		configFile = os.Args[1]
@@ -49,13 +51,11 @@ func main() {
 		vars.EXISTING_META = meta
 	}
 
-	defer func() { os.RemoveAll(vars.UPLOAD_BASE_DIR) }()
 	cloned := utils.Clone(vars.EXISTING_META)
 	StartCFUpload(config.ProjectName)
 
-	objects := buildObjects(vars.EXISTING_META, cloned, config.FilesPatch, config.By, config.ProjectName)
-	
 	if config.Mode == "patch" {
+		objects := buildObjects(vars.EXISTING_META, cloned, config.FilesPatch, config.By, config.ProjectName)
 		worker.BulkAddObjects(objects)
 	} else if config.Mode == "remove" {
 		worker.BulkRemoveObjects(config.FilesRemove)
@@ -96,7 +96,7 @@ func buildObjects(all, existing map[string]types.FileContainer, filePatches []wo
 			continue
 		}
 
-		metaJsonBytes, mrErr := json.Marshal(fileContainer)
+		metaJsonBytes, mrErr := json.Marshal(file.Metadata)
 		if mrErr != nil {
 			fmt.Println("❌ Error marshalling metadata:", mrErr)
 			continue

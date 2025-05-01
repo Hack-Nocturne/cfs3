@@ -24,7 +24,7 @@ func init() {
 
 	var err error
 	// Initialize the database connection
-	d1Dialect := gormd1.Open(fmt.Sprintf("d1://%s:%s@%s", vars.CF_ACCOUNT_ID, vars.CF_ACCOUNT_ID, cfDBId))
+	d1Dialect := gormd1.Open(fmt.Sprintf("d1://%s:%s@%s", vars.CF_ACCOUNT_ID, vars.CF_API_TOKEN, cfDBId))
 	db, err = gorm.Open(d1Dialect, &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
 		fmt.Println("❌ Failed to connect to the database:", err)

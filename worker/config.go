@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -99,7 +100,7 @@ func (c *Config) processPatchFiles(parentDir string) error {
 		return nil // No-op for non-patch mode
 	}
 
-	for _, fp := range c.FilesPatch {
+	for i, fp := range c.FilesPatch {
 		f, err := os.Open(fp.Local)
 		if err != nil {
 			return fmt.Errorf("opening %q: %w", fp.Local, err)
@@ -113,22 +114,13 @@ func (c *Config) processPatchFiles(parentDir string) error {
 		sha1hex := hex.EncodeToString(hasher.Sum(nil))
 		ext := strings.TrimPrefix(filepath.Ext(fp.Local), ".")
 
-		var perr error
-		absRoot, abErr := filepath.Abs(vars.UPLOAD_BASE_DIR)
-		if abErr != nil {
-			return fmt.Errorf("getting absolute path for %q: %w", vars.UPLOAD_BASE_DIR, abErr)
-		}
-
-		fp.Remote, perr = filepath.Rel(absRoot, fp.Remote)
-		if perr != nil {
-			return fmt.Errorf("getting relative path for %q: %w", fp.Remote, perr)
-		}
-
+		fp.Remote = path.Clean(fp.Remote)
+		fp.Remote = strings.TrimPrefix(fp.Remote, "/")
+		fp.Remote = path.Join(fp.Remote, fmt.Sprintf("%s.%s", sha1hex, ext))
 		fp.Remote = filepath.ToSlash(fp.Remote)
-		fp.Remote = filepath.Join(fp.Remote, fmt.Sprintf("%s.%s", sha1hex, ext))
 
-		dest := filepath.Join(parentDir, fp.Remote)
-		if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+		dest := path.Join(parentDir, fp.Remote)
+		if err := os.MkdirAll(path.Dir(dest), 0o755); err != nil {
 			return fmt.Errorf("making dirs for %q: %w", dest, err)
 		}
 
@@ -145,6 +137,8 @@ func (c *Config) processPatchFiles(parentDir string) error {
 			return fmt.Errorf("copying to %q: %w", dest, err)
 		}
 		out.Close()
+
+		c.FilesPatch[i] = fp
 	}
 	return nil
 }
