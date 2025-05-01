@@ -11,18 +11,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Hack-Nocturne/cfs3/types"
 	"github.com/Hack-Nocturne/cfs3/vars"
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/zeebo/blake3"
 )
-
-// FileContainer holds file metadata.
-type FileContainer struct {
-	Path        string
-	ContentType string
-	SizeInBytes int64
-	Hash        string
-}
 
 // Ignore patterns (similar to the Node.js ignore list)
 var ignorePatterns = []string{
@@ -59,7 +52,7 @@ type fileTask struct {
 
 // validate walks the directory, processes files concurrently,
 // and returns a map of relative paths to FileContainer.
-func Validate(directory, projName string) (map[string]FileContainer, error) {
+func Validate(directory, projName string) (map[string]types.FileContainer, error) {
 	absDir, err := filepath.Abs(directory)
 	if err != nil {
 		return nil, err
@@ -131,7 +124,7 @@ func Validate(directory, projName string) (map[string]FileContainer, error) {
 		return nil, fmt.Errorf("number of files %d exceeds maximum allowed %d", len(tasks), vars.MAX_ASSET_COUNT)
 	}
 
-	results := make(map[string]FileContainer)
+	results := vars.EXISTING_META
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
@@ -167,7 +160,7 @@ func Validate(directory, projName string) (map[string]FileContainer, error) {
 					mimeType = "application/octet-stream"
 				}
 
-				container := FileContainer{
+				container := types.FileContainer{
 					Path:        task.fullPath,
 					ContentType: mimeType,
 					SizeInBytes: task.size,

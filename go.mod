@@ -7,4 +7,11 @@ require (
 	github.com/zeebo/blake3 v0.2.4
 )
 
-require github.com/klauspost/cpuid/v2 v2.0.12 // indirect
+require (
+	github.com/jinzhu/inflection v1.0.0 // indirect
+	github.com/jinzhu/now v1.1.5 // indirect
+	github.com/klauspost/cpuid/v2 v2.0.12 // indirect
+	github.com/kofj/gorm-driver-d1 v1.0.0-rc1 // indirect
+	golang.org/x/text v0.20.0 // indirect
+	gorm.io/gorm v1.26.0 // indirect
+)

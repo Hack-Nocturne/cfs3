@@ -3,6 +3,8 @@ package utils
 import (
 	"fmt"
 	"time"
+
+	"github.com/Hack-Nocturne/cfs3/types"
 )
 
 // UploadPayloadFile represents a file upload payload.
@@ -17,7 +19,7 @@ type UploadPayloadFile struct {
 
 // UploadArgs holds parameters for the upload function.
 type UploadArgs struct {
-	FileMap     map[string]FileContainer
+	FileMap     map[string]types.FileContainer
 	Jwt         *string
 	AccountId   string
 	ProjectName string

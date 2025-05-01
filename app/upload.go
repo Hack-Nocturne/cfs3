@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Hack-Nocturne/cfs3/types"
 	"github.com/Hack-Nocturne/cfs3/utils"
 	"github.com/Hack-Nocturne/cfs3/vars"
 )
@@ -40,7 +41,7 @@ func Upload(args utils.UploadArgs) (map[string]string, error) {
 	}
 
 	// Convert the file map to a slice.
-	var files []utils.FileContainer
+	var files []types.FileContainer
 	for _, f := range args.FileMap {
 		files = append(files, f)
 	}
@@ -107,7 +108,7 @@ func Upload(args utils.UploadArgs) (map[string]string, error) {
 	}
 
 	// Filter files that need to be uploaded.
-	var sortedFiles []utils.FileContainer
+	var sortedFiles []types.FileContainer
 	missingSet := make(map[string]bool)
 	for _, h := range missingHashes {
 		missingSet[h] = true
@@ -124,14 +125,14 @@ func Upload(args utils.UploadArgs) (map[string]string, error) {
 
 	// Bucket the files.
 	type Bucket struct {
-		Files         []utils.FileContainer
+		Files         []types.FileContainer
 		RemainingSize int64
 	}
 	var buckets []Bucket
 	// Start with a few buckets so that even small projects benefit from concurrency.
 	for range vars.BULK_UPLOAD_CONCURRENCY {
 		buckets = append(buckets, Bucket{
-			Files:         []utils.FileContainer{},
+			Files:         []types.FileContainer{},
 			RemainingSize: vars.MAX_BUCKET_SIZE,
 		})
 	}
@@ -150,7 +151,7 @@ func Upload(args utils.UploadArgs) (map[string]string, error) {
 		}
 		if !inserted {
 			buckets = append(buckets, Bucket{
-				Files:         []utils.FileContainer{file},
+				Files:         []types.FileContainer{file},
 				RemainingSize: vars.MAX_BUCKET_SIZE - file.SizeInBytes,
 			})
 		}

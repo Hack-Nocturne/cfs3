@@ -1,0 +1,22 @@
+{
+  "by": "id-of-uploader",
+  "mode": "patch|remove|list",
+  "project_name": "cf-pages-project-name",
+  "header": {
+    "key1": "value1",
+    "key2": "value2"
+  },
+  "files__patch": [
+    {
+      "local": "path/to/local/file",
+      "remote": "path/to/remote",
+      "metadata": {
+        "key": "value"
+      }
+    }
+  ],
+  "files__remove": [
+    123,
+    456
+  ]
+}

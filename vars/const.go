@@ -11,4 +11,5 @@ const (
 	MAX_CHECK_MISSING_ATTEMPTS = 4
 	MAX_UPLOAD_ATTEMPTS        = 8
 	MAX_UPLOAD_GATEWAY_ERRORS  = 4
+	UPLOAD_BASE_DIR            = "cfs3__uploads"
 )
