@@ -1,0 +1,4 @@
+cfs3
+.env
+*.log
+.dev.vars
