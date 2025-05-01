@@ -38,7 +38,7 @@ func LoadNProcessConfig(path string) (*Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reading config: %w", err)
 	}
-	
+
 	var cfg Config
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("parsing config JSON: %w", err)
@@ -113,11 +113,21 @@ func (c *Config) processPatchFiles(parentDir string) error {
 		sha1hex := hex.EncodeToString(hasher.Sum(nil))
 		ext := strings.TrimPrefix(filepath.Ext(fp.Local), ".")
 
-		fp.Remote = strings.TrimSuffix(fp.Remote, "/")
-		fp.Remote = strings.TrimSuffix(fp.Remote, "\\")
-		remotePath := fmt.Sprintf("%s/%s.%s", fp.Remote, sha1hex, ext)
+		var perr error
+		absRoot, abErr := filepath.Abs(vars.UPLOAD_BASE_DIR)
+		if abErr != nil {
+			return fmt.Errorf("getting absolute path for %q: %w", vars.UPLOAD_BASE_DIR, abErr)
+		}
 
-		dest := filepath.Join(parentDir, remotePath)
+		fp.Remote, perr = filepath.Rel(absRoot, fp.Remote)
+		if perr != nil {
+			return fmt.Errorf("getting relative path for %q: %w", fp.Remote, perr)
+		}
+
+		fp.Remote = filepath.ToSlash(fp.Remote)
+		fp.Remote = filepath.Join(fp.Remote, fmt.Sprintf("%s.%s", sha1hex, ext))
+
+		dest := filepath.Join(parentDir, fp.Remote)
 		if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
 			return fmt.Errorf("making dirs for %q: %w", dest, err)
 		}

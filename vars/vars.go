@@ -6,4 +6,5 @@ var (
 	CF_ACCOUNT_ID = "cf_account_id"
 	CF_API_TOKEN  = "cf_api_token"
 	EXISTING_META = make(map[string]types.FileContainer)
+	IS_PATCH_MODE = false
 )

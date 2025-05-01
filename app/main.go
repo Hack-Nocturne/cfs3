@@ -1,19 +1,35 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"path"
 
+	"github.com/Hack-Nocturne/cfs3/types"
 	"github.com/Hack-Nocturne/cfs3/utils"
 	"github.com/Hack-Nocturne/cfs3/vars"
 	"github.com/Hack-Nocturne/cfs3/worker"
 )
 
+func init() {
+	os.MkdirAll(vars.UPLOAD_BASE_DIR, 0o755)
+}
+
 func main() {
-	config, cfgErr := worker.LoadNProcessConfig("cfs3.config.json")
+	// get config file from command line args or use default
+	configFile := "cfs3.config.json"
+	if len(os.Args) > 1 {
+		configFile = os.Args[1]
+	}
+
+	config, cfgErr := worker.LoadNProcessConfig(configFile)
 	if cfgErr != nil {
 		fmt.Println("❌ Failure loading config:", cfgErr)
 		return
 	}
+
+	vars.IS_PATCH_MODE = config.Mode == "patch"
 
 	if config.Mode == "remove" {
 		meta, meErr := worker.FetchAllMetaExcluding(config.ProjectName, config.FilesRemove)
@@ -33,8 +49,19 @@ func main() {
 		vars.EXISTING_META = meta
 	}
 
+	defer func() { os.RemoveAll(vars.UPLOAD_BASE_DIR) }()
+	cloned := utils.Clone(vars.EXISTING_META)
 	StartCFUpload(config.ProjectName)
-	// ToDo: Implement bulk add to database
+
+	objects := buildObjects(vars.EXISTING_META, cloned, config.FilesPatch, config.By, config.ProjectName)
+	
+	if config.Mode == "patch" {
+		worker.BulkAddObjects(objects)
+	} else if config.Mode == "remove" {
+		worker.BulkRemoveObjects(config.FilesRemove)
+	}
+
+	fmt.Println("💾 Metadata updated successfully.")
 }
 
 func StartCFUpload(projectName string) error {
@@ -54,4 +81,38 @@ func StartCFUpload(projectName string) error {
 	fmt.Println("💫 Deployment completed with ID: " + deployResp.ID)
 	fmt.Println("🌐 Take a peek over " + deployResp.URL)
 	return nil
+}
+
+func buildObjects(all, existing map[string]types.FileContainer, filePatches []worker.FilePatch, by, projName string) []worker.Object {
+	objects := make([]worker.Object, 0, len(all)-len(existing))
+
+	for _, file := range filePatches {
+		if _, exists := existing[file.Remote]; exists {
+			continue
+		}
+
+		fileContainer, exists := all[file.Remote]
+		if !exists {
+			continue
+		}
+
+		metaJsonBytes, mrErr := json.Marshal(fileContainer)
+		if mrErr != nil {
+			fmt.Println("❌ Error marshalling metadata:", mrErr)
+			continue
+		}
+
+		metaJson := string(metaJsonBytes)
+
+		objects = append(objects, worker.Object{
+			Hash:        fileContainer.Hash,
+			RelPath:     file.Remote,
+			Name:        path.Base(file.Local),
+			AddedBy:     &by,
+			ProjectName: projName,
+			Metadata:    &metaJson,
+		})
+	}
+
+	return objects
 }

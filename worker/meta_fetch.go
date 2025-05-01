@@ -1,7 +1,11 @@
 package worker
 
 import (
+	"math/rand"
+	"path/filepath"
+
 	"github.com/Hack-Nocturne/cfs3/types"
+	"github.com/Hack-Nocturne/cfs3/utils"
 )
 
 func FetchAllMeta(projName string) (map[string]types.FileContainer, error) {
@@ -26,14 +30,15 @@ func createObjectMap(objects []Object) map[string]types.FileContainer {
 	objectsMap := make(map[string]types.FileContainer, len(objects))
 
 	for _, obj := range objects {
+		// Cloudflare only cares about the file hash so fake other fields
 		fileContainer := types.FileContainer{
-			Path:        obj.Path,
-			SizeInBytes: obj.SizeInBytes,
+			ContentType: utils.ExtToMimeType(filepath.Ext(obj.RelPath)),
+			Path:        "/home/admin/" + obj.RelPath,
+			SizeInBytes: rand.Int63n(10485760) + 1024, // Random size between 1KB and 10MB
 			Hash:        obj.Hash,
-			ContentType: obj.ContentType,
 		}
 
-		objectsMap[obj.Path] = fileContainer
+		objectsMap[obj.RelPath] = fileContainer
 	}
 
 	return objectsMap

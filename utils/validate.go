@@ -58,6 +58,10 @@ func Validate(directory, projName string) (map[string]types.FileContainer, error
 		return nil, err
 	}
 
+	if !vars.IS_PATCH_MODE {
+		return vars.EXISTING_META, nil
+	}
+
 	startTime := time.Now()
 
 	defer func() {
@@ -124,7 +128,6 @@ func Validate(directory, projName string) (map[string]types.FileContainer, error
 		return nil, fmt.Errorf("number of files %d exceeds maximum allowed %d", len(tasks), vars.MAX_ASSET_COUNT)
 	}
 
-	results := vars.EXISTING_META
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
@@ -169,7 +172,7 @@ func Validate(directory, projName string) (map[string]types.FileContainer, error
 
 				// Protect concurrent map writes.
 				mu.Lock()
-				results[task.relative] = container
+				vars.EXISTING_META[task.relative] = container
 				mu.Unlock()
 			}
 		}()
@@ -182,5 +185,5 @@ func Validate(directory, projName string) (map[string]types.FileContainer, error
 	close(tasksChan)
 	wg.Wait()
 
-	return results, nil
+	return vars.EXISTING_META, nil
 }

@@ -155,3 +155,16 @@ func IncUpTo(prefix string, current, total int) {
 		fmt.Println() // finish with newline
 	}
 }
+
+func Clone[T any](src T) T {
+	var dst T
+	data, err := json.Marshal(src)
+	if err != nil {
+		panic(err) // Handle error appropriately in production code
+	}
+	err = json.Unmarshal(data, &dst)
+	if err != nil {
+		panic(err) // Handle error appropriately in production code
+	}
+	return dst
+}
