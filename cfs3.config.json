@@ -2,14 +2,14 @@
   "by": "id-of-uploader",
   "mode": "patch|remove|list",
   "project_name": "cf-pages-project-name",
-  "header": {
+  "headers": {
     "key1": "value1",
     "key2": "value2"
   },
   "files__patch": [
     {
-      "local": "path/to/local/file",
-      "remote": "path/to/remote",
+      "local_file": "path/to/local/file",
+      "remote_dir": "path/to/remote",
       "metadata": {
         "key": "value"
       }

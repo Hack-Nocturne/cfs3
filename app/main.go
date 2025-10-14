@@ -54,10 +54,11 @@ func main() {
 	cloned := utils.Clone(vars.EXISTING_META)
 	StartCFUpload(config.ProjectName)
 
-	if config.Mode == "patch" {
+	switch config.Mode {
+	case "patch":
 		objects := buildObjects(vars.EXISTING_META, cloned, config.FilesPatch, config.By, config.ProjectName)
 		worker.BulkAddObjects(objects)
-	} else if config.Mode == "remove" {
+	case "remove":
 		worker.BulkRemoveObjects(config.FilesRemove)
 	}
 
@@ -107,7 +108,7 @@ func buildObjects(all, existing map[string]types.FileContainer, filePatches []wo
 		objects = append(objects, worker.Object{
 			Hash:        fileContainer.Hash,
 			RelPath:     file.Remote,
-			Name:        path.Base(file.Local),
+			Name:        path.Base(file.LocalFile),
 			AddedBy:     &by,
 			ProjectName: projName,
 			Metadata:    &metaJson,
