@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Hack-Nocturne/cfs3/types"
 	"github.com/Hack-Nocturne/cfs3/vars"
 )
 
@@ -20,9 +21,9 @@ var mu sync.Mutex
 
 // fetchResult makes an HTTP request to the given URL (appended to apiBaseURL)
 // with the specified method, headers and body. It then decodes the JSON response into result.
-func FetchResult[T any](url, method string, headers map[string]string, body []byte) (CFResponse[T], error) {
+func fetchResult[T any](url, method string, headers map[string]string, body []byte) (types.CFResponse[T], error) {
 	client := &http.Client{}
-	empty := CFResponse[T]{}
+	empty := types.CFResponse[T]{}
 	req, err := http.NewRequest(method, vars.API_BASE_URL+url, bytes.NewReader(body))
 	if err != nil {
 		return empty, err
@@ -50,7 +51,7 @@ func FetchResult[T any](url, method string, headers map[string]string, body []by
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		respBody, _ := io.ReadAll(resp.Body)
-		return empty, &APIError{StatusCode: resp.StatusCode, Message: string(respBody)}
+		return empty, &types.APIError{StatusCode: resp.StatusCode, Message: string(respBody)}
 	}
 
 	respBody, err := io.ReadAll(resp.Body)
@@ -58,7 +59,7 @@ func FetchResult[T any](url, method string, headers map[string]string, body []by
 		return empty, err
 	}
 
-	var response CFResponse[T]
+	var response types.CFResponse[T]
 	json.Unmarshal(respBody, &response)
 
 	if !response.Success {
@@ -100,7 +101,7 @@ func logError(errors []string) {
 
 // isJwtExpired decodes the JWT (assumes a standard JWT with an "exp" claim)
 // and returns whether it has expired.
-func IsJwtExpired(token string) (bool, error) {
+func isJwtExpired(token string) (bool, error) {
 	parts := strings.Split(token, ".")
 	if len(parts) < 2 {
 		return false, errors.New("invalid token format")
@@ -131,7 +132,7 @@ func IsJwtExpired(token string) (bool, error) {
 }
 
 // formatTime returns a formatted string for a duration.
-func FormatTime(duration time.Duration) string {
+func formatTime(duration time.Duration) string {
 	return fmt.Sprintf("(%.2f sec)", duration.Seconds())
 }
 
@@ -141,8 +142,8 @@ var (
 	frameMu     sync.Mutex
 )
 
-// IncUpTo prints a rotating-earth spinner plus “prefix: current/total” on one line.
-func IncUpTo(prefix string, current, total int) {
+// incUpTo prints a rotating-earth spinner plus “prefix: current/total” on one line.
+func incUpTo(prefix string, current, total int) {
 	frameMu.Lock()
 	emoji := earthFrames[frameIndex]
 	frameIndex = (frameIndex + 1) % len(earthFrames)

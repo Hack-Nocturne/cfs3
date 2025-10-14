@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"bytes"
@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/Hack-Nocturne/cfs3/utils"
+	"github.com/Hack-Nocturne/cfs3/types"
 )
 
 // Deploy publishes the directory to Cloudflare Pages by performing the following steps:
@@ -18,7 +18,7 @@ import (
 //  3. Validates the directory and uploads static assets to generate a manifest.
 //  4. Constructs a multipart payload including the manifest and worker bundle.
 //  5. Sends a POST request to the deployment endpoint with retry logic.
-func Deploy(options utils.PagesDeployOptions) (*utils.DeploymentResponse, error) {
+func Deploy(options types.PagesDeployOptions, isPatchMode bool) (*types.DeploymentResponse, map[string]types.FileContainer, error) {
 	directory := options.Directory
 	accountId := options.AccountId
 	projectName := options.ProjectName
@@ -64,26 +64,26 @@ func Deploy(options utils.PagesDeployOptions) (*utils.DeploymentResponse, error)
 
 	// Fetch project info from Cloudflare.
 	projectUrl := fmt.Sprintf("/accounts/%s/pages/projects/%s", accountId, projectName)
-	if _, err := utils.FetchResult[utils.ProjectResponse](projectUrl, "GET", nil, nil); err != nil {
-		return nil, fmt.Errorf("failed to fetch project info: %v", err)
+	if _, err := fetchResult[types.ProjectResponse](projectUrl, "GET", nil, nil); err != nil {
+		return nil, nil, fmt.Errorf("failed to fetch project info: %v", err)
 	}
 
 	// Validate the directory and get a file map.
-	fileMap, err := utils.Validate(directory, options.ProjectName)
+	fileMap, err := validate(directory, isPatchMode)
 	if err != nil {
-		return nil, fmt.Errorf("validation error: %v", err)
+		return nil, nil, fmt.Errorf("validation error: %v", err)
 	}
 
 	// Upload static assets and obtain the manifest.
-	uploadArgs := utils.UploadArgs{
+	uploadArgs := types.UploadArgs{
 		FileMap:     fileMap,
 		AccountId:   accountId,
 		ProjectName: projectName,
 		SkipCaching: skipCaching,
 	}
-	manifest, err := Upload(uploadArgs)
+	manifest, err := upload(uploadArgs)
 	if err != nil {
-		return nil, fmt.Errorf("upload error: %v", err)
+		return nil, nil, fmt.Errorf("upload error: %v", err)
 	}
 
 	// Build a multipart form-data payload.
@@ -93,16 +93,16 @@ func Deploy(options utils.PagesDeployOptions) (*utils.DeploymentResponse, error)
 	// Add the manifest (as JSON).
 	manifestJson, err := json.Marshal(manifest)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal manifest: %v", err)
+		return nil, nil, fmt.Errorf("failed to marshal manifest: %v", err)
 	}
 	if err = writer.WriteField("manifest", string(manifestJson)); err != nil {
-		return nil, fmt.Errorf("failed to write manifest field: %v", err)
+		return nil, nil, fmt.Errorf("failed to write manifest field: %v", err)
 	}
 
 	// Include branch information if provided.
 	if branch != "" {
 		if err = writer.WriteField("branch", branch); err != nil {
-			return nil, fmt.Errorf("failed to write branch field: %v", err)
+			return nil, nil, fmt.Errorf("failed to write branch field: %v", err)
 		}
 	}
 
@@ -110,7 +110,7 @@ func Deploy(options utils.PagesDeployOptions) (*utils.DeploymentResponse, error)
 	if headersContent != "" {
 		part, err := writer.CreateFormFile("_headers", "_headers")
 		if err != nil {
-			return nil, fmt.Errorf("failed to create _headers form file: %v", err)
+			return nil, nil, fmt.Errorf("failed to create _headers form file: %v", err)
 		}
 		part.Write([]byte(headersContent))
 	}
@@ -119,7 +119,7 @@ func Deploy(options utils.PagesDeployOptions) (*utils.DeploymentResponse, error)
 	if redirectsContent != "" {
 		part, err := writer.CreateFormFile("_redirects", "_redirects")
 		if err != nil {
-			return nil, fmt.Errorf("failed to create _redirects form file: %v", err)
+			return nil, nil, fmt.Errorf("failed to create _redirects form file: %v", err)
 		}
 		part.Write([]byte(redirectsContent))
 	}
@@ -128,7 +128,7 @@ func Deploy(options utils.PagesDeployOptions) (*utils.DeploymentResponse, error)
 	if routesCustomContent != "" {
 		part, err := writer.CreateFormFile("_routes.json", "_routes.json")
 		if err != nil {
-			return nil, fmt.Errorf("failed to create _routes.json form file: %v", err)
+			return nil, nil, fmt.Errorf("failed to create _routes.json form file: %v", err)
 		}
 		part.Write([]byte(routesCustomContent))
 	}
@@ -138,14 +138,14 @@ func Deploy(options utils.PagesDeployOptions) (*utils.DeploymentResponse, error)
 		// In this simplified example the bundle is just the content from _worker.js (or its entry file).
 		part, err := writer.CreateFormFile("_worker.bundle", "_worker.bundle")
 		if err != nil {
-			return nil, fmt.Errorf("failed to create _worker.bundle form file: %v", err)
+			return nil, nil, fmt.Errorf("failed to create _worker.bundle form file: %v", err)
 		}
 		part.Write([]byte(workerJSContent))
 	}
 
 	// Finalize the form-data payload.
 	if err = writer.Close(); err != nil {
-		return nil, fmt.Errorf("failed to close form writer: %v", err)
+		return nil, nil, fmt.Errorf("failed to close form writer: %v", err)
 	}
 
 	// Prepare to POST the deployment.
@@ -158,12 +158,12 @@ func Deploy(options utils.PagesDeployOptions) (*utils.DeploymentResponse, error)
 	var lastErr error
 	// Retry loop with exponential backoff.
 	for attempts := range maxAttempts {
-		if deploymentResponse, err := utils.FetchResult[utils.DeploymentResponse](deployURL, "POST", headers, buf.Bytes()); err == nil {
-			return &deploymentResponse.Result, nil
+		if deploymentResponse, err := fetchResult[types.DeploymentResponse](deployURL, "POST", headers, buf.Bytes()); err == nil {
+			return &deploymentResponse.Result, fileMap, nil
 		}
 		lastErr = err
 		time.Sleep(time.Duration(1<<attempts) * time.Second)
 	}
 
-	return nil, fmt.Errorf("deployment failed after %d attempts: %v", maxAttempts, lastErr)
+	return nil, nil, fmt.Errorf("deployment failed after %d attempts: %v", maxAttempts, lastErr)
 }

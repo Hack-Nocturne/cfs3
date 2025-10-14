@@ -52,17 +52,18 @@ type fileTask struct {
 
 // validate walks the directory, processes files concurrently,
 // and returns a map of relative paths to FileContainer.
-func Validate(directory, projName string) (map[string]types.FileContainer, error) {
+func validate(directory string, isPatchMode bool) (map[string]types.FileContainer, error) {
 	absDir, err := filepath.Abs(directory)
 	if err != nil {
 		return nil, err
 	}
 
-	if !vars.IS_PATCH_MODE {
-		return vars.EXISTING_META, nil
+	if !isPatchMode {
+		return nil, nil
 	}
 
 	startTime := time.Now()
+	var fileMap map[string]types.FileContainer
 
 	defer func() {
 		duration := time.Since(startTime).Seconds()
@@ -172,7 +173,7 @@ func Validate(directory, projName string) (map[string]types.FileContainer, error
 
 				// Protect concurrent map writes.
 				mu.Lock()
-				vars.EXISTING_META[task.relative] = container
+				fileMap[task.relative] = container
 				mu.Unlock()
 			}
 		}()
@@ -185,5 +186,5 @@ func Validate(directory, projName string) (map[string]types.FileContainer, error
 	close(tasksChan)
 	wg.Wait()
 
-	return vars.EXISTING_META, nil
+	return fileMap, nil
 }

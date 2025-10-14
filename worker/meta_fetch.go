@@ -33,9 +33,9 @@ func createObjectMap(objects []Object) map[string]types.FileContainer {
 		// Cloudflare only cares about the file hash so fake other fields
 		fileContainer := types.FileContainer{
 			ContentType: utils.ExtToMimeType(filepath.Ext(obj.RelPath)),
-			Path:        "/home/admin/" + obj.RelPath,
+			Path:        "/home/admin/" + obj.RelPath, // Anything here just works ;)
 			SizeInBytes: rand.Int63n(10485760) + 1024, // Random size between 1KB and 10MB
-			Hash:        obj.Hash,
+			Hash:        obj.Hash,                     // This field is critical ot preserve files that are already deployed
 		}
 
 		objectsMap[obj.RelPath] = fileContainer

@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"encoding/base64"
@@ -10,13 +10,12 @@ import (
 	"time"
 
 	"github.com/Hack-Nocturne/cfs3/types"
-	"github.com/Hack-Nocturne/cfs3/utils"
 	"github.com/Hack-Nocturne/cfs3/vars"
 )
 
 // upload processes file uploads by first determining missing file hashes,
 // bucketing files, and concurrently uploading each bucket.
-func Upload(args utils.UploadArgs) (map[string]string, error) {
+func upload(args types.UploadArgs) (map[string]string, error) {
 	// fetchJwt returns a JWT string either from the provided args
 	// or by calling the API endpoint.
 	fetchJwt := func() (string, error) {
@@ -27,7 +26,7 @@ func Upload(args utils.UploadArgs) (map[string]string, error) {
 		type JwtResponse struct {
 			JWT string `json:"jwt"`
 		}
-		jwtResp, err := utils.FetchResult[JwtResponse](
+		jwtResp, err := fetchResult[JwtResponse](
 			fmt.Sprintf("/accounts/%s/pages/projects/%s/upload-token", args.AccountId, args.ProjectName),
 			"GET",
 			nil,
@@ -80,17 +79,17 @@ func Upload(args utils.UploadArgs) (map[string]string, error) {
 			"Authorization": "Bearer " + jwt,
 		}
 
-		missingResp, err := utils.FetchResult[[]string]("/pages/assets/check-missing", "POST", headers, payloadBytes)
+		missingResp, err := fetchResult[[]string]("/pages/assets/check-missing", "POST", headers, payloadBytes)
 		if err != nil {
 			if attempts < vars.MAX_CHECK_MISSING_ATTEMPTS {
 				time.Sleep(time.Second * time.Duration(1<<attempts))
 				attempts++
 				// If unauthorized or JWT expired, refresh the token.
-				if apiErr, ok := err.(*utils.APIError); ok && apiErr.StatusCode == 401 {
+				if apiErr, ok := err.(*types.APIError); ok && apiErr.StatusCode == 401 {
 					if newJwt, err := fetchJwt(); err == nil {
 						jwt = newJwt
 					}
-				} else if expired, _ := utils.IsJwtExpired(jwt); expired {
+				} else if expired, _ := isJwtExpired(jwt); expired {
 					if newJwt, err := fetchJwt(); err == nil {
 						jwt = newJwt
 					}
@@ -160,7 +159,7 @@ func Upload(args utils.UploadArgs) (map[string]string, error) {
 
 	// Set up progress reporting.
 	counter := len(args.FileMap) - len(sortedFiles)
-	utils.IncUpTo(args.ProjectName, counter, len(args.FileMap))
+	incUpTo(args.ProjectName, counter, len(args.FileMap))
 
 	// Use a semaphore to limit concurrency.
 	sem := make(chan struct{}, vars.BULK_UPLOAD_CONCURRENCY)
@@ -182,7 +181,7 @@ func Upload(args utils.UploadArgs) (map[string]string, error) {
 			var doUpload func() error
 			doUpload = func() error {
 				// Build the payload.
-				payload := make([]utils.UploadPayloadFile, len(bucket.Files))
+				payload := make([]types.UploadPayloadFile, len(bucket.Files))
 				for i, file := range bucket.Files {
 					data, err := os.ReadFile(file.Path)
 					if err != nil {
@@ -203,25 +202,26 @@ func Upload(args utils.UploadArgs) (map[string]string, error) {
 					"Authorization": "Bearer " + jwt,
 				}
 
-				_, err = utils.FetchResult[utils.UploadResponse]("/pages/assets/upload", "POST", headers, payloadBytes)
+				_, err = fetchResult[types.UploadResponse]("/pages/assets/upload", "POST", headers, payloadBytes)
 				if err != nil {
 					if attempts < vars.MAX_UPLOAD_ATTEMPTS {
 						time.Sleep(time.Second * time.Duration(1<<attempts))
 						attempts++
-						if apiErr, ok := err.(*utils.APIError); ok {
+						if apiErr, ok := err.(*types.APIError); ok {
 							// Check for gateway errors (e.g. 502, 503, 504)
-							if apiErr.StatusCode == 502 || apiErr.StatusCode == 503 || apiErr.StatusCode == 504 {
+							switch apiErr.StatusCode {
+							case 502, 503, 504:
 								gatewayErrors++
 								if gatewayErrors >= vars.MAX_UPLOAD_GATEWAY_ERRORS {
 									attempts++
 								}
 								time.Sleep(time.Second * 5 * time.Duration(1<<gatewayErrors))
-							} else if apiErr.StatusCode == 401 {
+							case 401:
 								if newJwt, err := fetchJwt(); err == nil {
 									jwt = newJwt
 								}
 							}
-						} else if expired, _ := utils.IsJwtExpired(jwt); expired {
+						} else if expired, _ := isJwtExpired(jwt); expired {
 							if newJwt, err := fetchJwt(); err == nil {
 								jwt = newJwt
 							}
@@ -246,7 +246,7 @@ func Upload(args utils.UploadArgs) (map[string]string, error) {
 			} else {
 				mu.Lock()
 				counter += len(bucket.Files)
-				utils.IncUpTo(args.ProjectName, counter, len(args.FileMap))
+				incUpTo(args.ProjectName, counter, len(args.FileMap))
 				mu.Unlock()
 			}
 		}(bucket)
@@ -263,7 +263,7 @@ func Upload(args utils.UploadArgs) (map[string]string, error) {
 	if skipped > 0 {
 		skippedMessage = fmt.Sprintf("(%d already uploaded) ", skipped)
 	}
-	fmt.Printf("✨ Success! Uploaded %d files %s%s\n", len(sortedFiles), skippedMessage, utils.FormatTime(uploadDuration))
+	fmt.Printf("✨ Success! Uploaded %d files %s%s\n", len(sortedFiles), skippedMessage, formatTime(uploadDuration))
 
 	// Upsert hashes.
 	doUpsertHashes := func() error {
@@ -281,16 +281,16 @@ func Upload(args utils.UploadArgs) (map[string]string, error) {
 			"Content-Type":  "application/json",
 			"Authorization": "Bearer " + jwt,
 		}
-		_, err = utils.FetchResult[any]("/pages/assets/upsert-hashes", "POST", headers, payloadBytes)
+		_, err = fetchResult[any]("/pages/assets/upsert-hashes", "POST", headers, payloadBytes)
 		if err != nil {
 			time.Sleep(1 * time.Second)
-			if apiErr, ok := err.(*utils.APIError); ok && apiErr.StatusCode == 401 {
+			if apiErr, ok := err.(*types.APIError); ok && apiErr.StatusCode == 401 {
 				if newJwt, err := fetchJwt(); err == nil {
 					jwt = newJwt
 				}
 			}
 
-			_, upsertHashErr := utils.FetchResult[any]("/pages/assets/upsert-hashes", "POST", headers, payloadBytes)
+			_, upsertHashErr := fetchResult[any]("/pages/assets/upsert-hashes", "POST", headers, payloadBytes)
 			return upsertHashErr
 		}
 		return nil
