@@ -12,6 +12,14 @@ import (
 	"github.com/Hack-Nocturne/cfs3/worker"
 )
 
+type CFS3Mode string
+
+const (
+	ModePatch  CFS3Mode = "patch"
+	ModeRemove CFS3Mode = "remove"
+	ModeList   CFS3Mode = "list"
+)
+
 // FilePatch represents a single patch operation.
 type FilePatch struct {
 	LocalFile string         `json:"local_file"`
@@ -22,7 +30,7 @@ type FilePatch struct {
 // CFS3Config represents the top-level configuration.
 type CFS3Config struct {
 	By          string            `json:"by"`
-	Mode        string            `json:"mode"`
+	Mode        CFS3Mode          `json:"mode"`
 	ProjectName string            `json:"project_name"`
 	Headers     map[string]string `json:"headers,omitempty"`
 	FilesPatch  []FilePatch       `json:"files__patch,omitempty"`
@@ -76,7 +84,7 @@ func (c *CFS3Config) Process() error {
 	// b) For remove mode, we exclude the removed files from existing metadata
 	// This way we always deploy the project with full metadata-set required without uploading same files again
 
-	if c.Mode == "remove" {
+	if c.Mode == ModeRemove {
 		meta, meErr := worker.FetchAllMetaExcluding(c.ProjectName, c.FilesRemove)
 		if meErr != nil {
 			return fmt.Errorf("failure fetching existing meta: %v", meErr)

@@ -28,7 +28,7 @@ func (c *CFS3Config) validate() error {
 		return errors.New("field 'project_name' is required")
 	}
 	switch c.Mode {
-	case "patch":
+	case ModePatch:
 		if len(c.FilesPatch) == 0 {
 			return errors.New("mode 'patch' requires non-empty files__patch")
 		}
@@ -36,11 +36,11 @@ func (c *CFS3Config) validate() error {
 		if len(c.FilesPatch) > 40 {
 			return errors.New("mode 'patch' supports a maximum of 40 files in files__patch in one run")
 		}
-	case "remove":
+	case ModeRemove:
 		if len(c.FilesRemove) == 0 {
 			return errors.New("mode 'remove' requires non-empty files__remove")
 		}
-	case "list":
+	case ModeList:
 		return errors.New("mode 'list' currently not implemented")
 	default:
 		return errors.New("mode unknown")
@@ -87,7 +87,7 @@ func (c *CFS3Config) validate() error {
 // processPatchFiles processes the patch files, generating SHA1 hashes and copying them to the specified directory.
 // It also ensures the directory structure is created as needed.
 func (c *CFS3Config) processPatchFiles(parentDir string) (map[string]string, error) {
-	if c.Mode != "patch" {
+	if c.Mode != ModePatch {
 		return nil, nil // No-op for non-patch mode
 	}
 
@@ -183,10 +183,10 @@ func (c *CFS3Config) createHeadersFile(parentDir string, fileMap map[string]stri
 
 func (c *CFS3Config) upsertMetadata() error {
 	switch c.Mode {
-	case "patch":
+	case ModePatch:
 		objects := buildObjects(c.metadata, utils.Clone(c.metadata), c.FilesPatch, c.By, c.ProjectName)
 		return worker.BulkAddObjects(objects)
-	case "remove":
+	case ModeRemove:
 		return worker.BulkRemoveObjects(c.FilesRemove)
 	}
 
